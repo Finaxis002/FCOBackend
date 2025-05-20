@@ -1,30 +1,40 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Service = require('../models/Service');
-const { authMiddleware } = require('../middleware/auth');
+const Service = require("../models/Service");
 
-// Create new service
-router.post('/', authMiddleware, async (req, res) => {
+// GET /api/services - fetch all services
+router.get("/", async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ message: 'Service name is required' });
-
-    const newService = new Service({ name });
-    await newService.save();
-
-    res.status(201).json({ message: 'Service created', service: newService });
+    const services = await Service.find({}).sort({ name: 1 }); // sorted alphabetically
+    res.json(services);
   } catch (err) {
-    res.status(500).json({ message: 'Error creating service', error: err.message });
+    console.error("Error fetching services:", err);
+    res.status(500).json({ message: "Server error fetching services" });
   }
 });
 
-// Get all services
-router.get('/', authMiddleware, async (req, res) => {
+// POST /api/services - add a new service
+router.post("/", async (req, res) => {
+  const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: "Service name is required" });
+  }
+
   try {
-    const services = await Service.find().sort({ name: 1 }); // sorted alphabetically
-    res.json(services);
+    // Check if service already exists (case-insensitive)
+    const existing = await Service.findOne({ name: { $regex: `^${name}$`, $options: "i" } });
+    if (existing) {
+      return res.status(409).json({ message: "Service already exists" });
+    }
+
+    const newService = new Service({ name: name.trim() });
+    await newService.save();
+
+    res.status(201).json(newService);
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching services' });
+    console.error("Error adding service:", err);
+    res.status(500).json({ message: "Server error adding service" });
   }
 });
 
