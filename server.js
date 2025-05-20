@@ -17,11 +17,11 @@ dotenv.config();
 
 const app = express();
 const corsOptions = {
-  origin: [
-    "http://localhost:3000", // for local dev frontend (adjust port if needed)
-    "https://fco.onrender.com", // deployed frontend URL
+  origin: [ 
+    "http://localhost:9002", // Your current frontend port
+    "https://fco.onrender.com", // Production
   ],
-  credentials: true, // if your frontend sends cookies or auth headers
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
