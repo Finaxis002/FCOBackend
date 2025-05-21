@@ -17,24 +17,18 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   const { name } = req.body;
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ message: "Service name is required" });
-  }
-
   try {
-    // Check if service already exists (case-insensitive)
-    const existing = await Service.findOne({ name: { $regex: `^${name}$`, $options: "i" } });
+    // Avoid duplicates
+    const existing = await Service.findOne({ name });
     if (existing) {
-      return res.status(409).json({ message: "Service already exists" });
+      return res.status(400).json({ message: "Service already exists" });
     }
 
-    const newService = new Service({ name: name.trim() });
-    await newService.save();
-
-    res.status(201).json(newService);
+    const service = await Service.create({ name });
+    res.status(201).json(service);
   } catch (err) {
-    console.error("Error adding service:", err);
-    res.status(500).json({ message: "Server error adding service" });
+    console.error(err);
+    res.status(500).json({ message: "Failed to add service" });
   }
 });
 
