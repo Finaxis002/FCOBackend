@@ -11,15 +11,16 @@ const loginRoute = require('./routes/loginRoute.js');
 const { initSocket } = require('./socket/socket.js')
 const notificationRoute = require("./routes/notifications.js");
 const serviceRoute = require('./routes/serviceRoute.js');
+const seedDefaultServices = require('./config/seedServices.js');
 
 
 dotenv.config();
 
 const app = express();
 const corsOptions = {
-  origin: [ 
-    "http://localhost:9002", // Your current frontend port
-    "https://fco.onrender.com", // Production
+  origin: [
+    "http://localhost:9002", // for local dev frontend (adjust port if needed)
+    "https://fco.onrender.com", // deployed frontend URL
   ],
   credentials: true,
 };
@@ -58,7 +59,7 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await connectDB(); // connect only once here
-
+    await seedDefaultServices();
     const server = http.createServer(app);
     const io = initSocket(server);
 
