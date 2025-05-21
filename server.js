@@ -12,6 +12,7 @@ const { initSocket } = require('./socket/socket.js')
 const notificationRoute = require("./routes/notifications.js");
 const serviceRoute = require('./routes/serviceRoute.js');
 const seedDefaultServices = require('./config/seedServices.js');
+const remarkRoute = require('./routes/remarksRoute.js')
 
 
 dotenv.config();
@@ -37,6 +38,8 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/auth", loginRoute);
 app.use("/api/notifications", notificationRoute)
 app.use("/api/services", serviceRoute);
+app.use("/api/cases/:caseId/services", remarkRoute);
+
 
 
 

@@ -1,12 +1,16 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const mongoose = require("mongoose");
+const bcrypt = require("bcrypt");
 
 const defaultPermissions = {
-  canCreate: true,
-  canEdit: true,
-  canDelete: true,
-  canViewReports: true,
-  canAssignTasks: true,
+  allCaseAccess: false,
+  viewRights: false,
+  createCaseRights: false,
+  createUserRights: false,
+  userRolesAndResponsibility: false,
+  delete: false,
+  edit: false,
+  remarksAndChat: false,
+  canShare: false,
 };
 
 const adminSchema = new mongoose.Schema({
@@ -14,7 +18,7 @@ const adminSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    default: 'admin',
+    default: "admin",
   },
   password: {
     type: String,
@@ -22,11 +26,11 @@ const adminSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    default: 'Super Admin',
+    default: "Super Admin",
   },
   role: {
     type: String,
-    default: 'Admin',
+    default: "Admin",
   },
   permissions: {
     type: Object,
@@ -35,10 +39,10 @@ const adminSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-adminSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+adminSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
-module.exports = mongoose.model('Admin', adminSchema);
+module.exports = mongoose.model("Admin", adminSchema);

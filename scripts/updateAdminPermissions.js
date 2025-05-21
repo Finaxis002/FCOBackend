@@ -1,21 +1,24 @@
-require('dotenv').config();
-const mongoose = require('mongoose');
-const Admin = require('../models/Admin');
+require("dotenv").config();
+const mongoose = require("mongoose");
+const Admin = require("../models/Admin");
 
 const updateAdminPermissions = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log('MongoDB connected');
+    console.log("MongoDB connected");
 
-    const adminId = 'admin'; // your adminId to find the document
+    const adminId = "admin"; // your adminId to find the document
 
     const update = {
       permissions: {
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-        canViewReports: true,
-        canAssignTasks: true,
+        allCaseAccess: true,
+        viewRights: true,
+        createCaseRights: true,
+        createUserRights: true,
+        userRolesAndResponsibility: true,
+        delete: true,
+        edit: true,
+        remarksAndChat: true,
       },
     };
 
@@ -28,13 +31,13 @@ const updateAdminPermissions = async () => {
     if (!updatedAdmin) {
       console.log(`Admin with adminId '${adminId}' not found`);
     } else {
-      console.log('Admin updated:', updatedAdmin);
+      console.log("Admin updated:", updatedAdmin);
     }
 
     await mongoose.disconnect();
     process.exit(0);
   } catch (err) {
-    console.error('Error updating admin:', err);
+    console.error("Error updating admin:", err);
     await mongoose.disconnect();
     process.exit(1);
   }
