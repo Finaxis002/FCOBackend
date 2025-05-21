@@ -2,12 +2,16 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
 const defaultPermissions = {
-  canCreate: false,
-  canEdit: false,
-  canDelete: false,
-  canViewReports: false,
-  canAssignTasks: false,
+  allCaseAccess: false,
+  viewRights: false,
+  createCaseRights: false,
+  createUserRights: false,
+  userRolesAndResponsibility: false,
+  delete: false,
+  edit: false,
+  remarksAndChat: false,
 };
+
 
 const userSchema = new mongoose.Schema(
   {

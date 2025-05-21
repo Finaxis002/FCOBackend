@@ -40,6 +40,7 @@ app.use("/api/services", serviceRoute);
 
 
 
+
 app.get("/", (req, res) => {
   res.send("FCO Backend API is running");
 });

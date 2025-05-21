@@ -32,4 +32,38 @@ router.post("/", async (req, res) => {
   }
 });
 
+
+// PUT update service by ID
+router.put("/:id", async (req, res) => {
+  try {
+    const serviceId = req.params.id;
+    const { name } = req.body;
+
+    if (!name || name.trim() === "") {
+      return res.status(400).json({ message: "Service name is required" });
+    }
+
+    // Check if service with new name already exists (optional)
+    const existingService = await Service.findOne({ name: name.trim() });
+    if (existingService && existingService._id.toString() !== serviceId) {
+      return res.status(400).json({ message: "Service name already exists" });
+    }
+
+    const updatedService = await Service.findByIdAndUpdate(
+      serviceId,
+      { name: name.trim() },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedService) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    res.json(updatedService);
+  } catch (error) {
+    console.error("Error updating service:", error);
+    res.status(500).json({ message: "Server error updating service" });
+  }
+});
+
 module.exports = router;
