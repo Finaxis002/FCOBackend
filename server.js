@@ -22,7 +22,7 @@ const corsOptions = {
     "http://localhost:9002", // for local dev frontend (adjust port if needed)
     "https://fco.onrender.com", // deployed frontend URL
   ],
-  credentials: true, // if your frontend sends cookies or auth headers
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
