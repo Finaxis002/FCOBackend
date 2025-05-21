@@ -9,8 +9,8 @@ function initSocket(server) {
   const io = new Server(server, {
     cors: {
       origin: [
-        "http://localhost:9002",
-        // Add your production domains here
+        "http://localhost:3000", // for local dev frontend (adjust port if needed)
+        "https://fco.onrender.com", // deployed frontend URL
       ],
       methods: ["GET", "POST"],
       credentials: true,
@@ -48,7 +48,7 @@ function initSocket(server) {
       try {
         const userInfo = socketUserMap[socket.id];
         if (!userInfo?.userId) {
-             console.log("❌ sendMessage rejected: not registered", socket.id);
+          console.log("❌ sendMessage rejected: not registered", socket.id);
           return socket.emit("error", "Not registered");
         }
 
