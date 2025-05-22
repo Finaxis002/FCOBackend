@@ -311,19 +311,29 @@ const updateCase = async (req, res) => {
 
     // Step 4: Build update payload with all fields
     const updatePayload = {
-      srNo,
-      ownerName,
-      clientName,
-      unitName,
-      franchiseAddress,
-      promoters,
-      authorizedPerson,
-      services,
+      srNo: srNo !== undefined ? srNo : existingCase.srNo,
+      ownerName: ownerName !== undefined ? ownerName : existingCase.ownerName,
+      clientName:
+        clientName !== undefined ? clientName : existingCase.clientName,
+      unitName: unitName !== undefined ? unitName : existingCase.unitName,
+      franchiseAddress:
+        franchiseAddress !== undefined
+          ? franchiseAddress
+          : existingCase.franchiseAddress,
+      promoters: promoters !== undefined ? promoters : existingCase.promoters,
+      authorizedPerson:
+        authorizedPerson !== undefined
+          ? authorizedPerson
+          : existingCase.authorizedPerson,
+      services: services !== undefined ? services : existingCase.services,
       assignedUsers: formattedAssignedUsers,
-      reasonForStatus,
-      status: status || existingCase.status,
+      reasonForStatus:
+        reasonForStatus !== undefined
+          ? reasonForStatus
+          : existingCase.reasonForStatus,
+      status: status !== undefined ? status : existingCase.status,
       overallCompletionPercentage,
-      overallStatus: status || existingCase.status,
+      overallStatus: status !== undefined ? status : existingCase.status,
       lastUpdate: new Date(),
     };
 
