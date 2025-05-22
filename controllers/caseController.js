@@ -1,8 +1,7 @@
 const Case = require("../models/Case.js");
 const User = require("../models/User.js");
 const Notification = require("../models/Notification");
-const Admin = require('../models/Admin'); // adjust path if needed
-
+const Admin = require("../models/Admin"); // adjust path if needed
 
 const addCase = async (req, res) => {
   try {
@@ -39,6 +38,19 @@ const addCase = async (req, res) => {
       };
     });
 
+    const totalServices = services ? services.length : 0;
+    const completedCount = services
+      ? services.filter((s) => s.status === "Completed").length
+      : 0;
+
+    const base = 50;
+    const remaining = 50;
+
+    const overallCompletionPercentage =
+      totalServices === 0
+        ? 50
+        : Math.min(base + (completedCount * remaining) / totalServices, 100);
+
     const newCase = new Case({
       srNo,
       ownerName,
@@ -48,10 +60,11 @@ const addCase = async (req, res) => {
       promoters,
       authorizedPerson,
       services,
-      assignedUsers: formattedAssignedUsers,
-      reasonForStatus,
+      overallCompletionPercentage,
       overallStatus: status || "To-be-Started",
       status: status || "New-Case",
+      assignedUsers: formattedAssignedUsers,
+      reasonForStatus,
       lastUpdate: new Date(),
     });
 
@@ -71,7 +84,7 @@ const addCase = async (req, res) => {
 
     // 🔔 Notify All Admins (optional: only Super Admins if needed)
     const admins = await Admin.find().select("_id name"); // Adjust if you want only Super Admins
-    const assignedNames = formattedAssignedUsers.map(u => u.name).join(", ");
+    const assignedNames = formattedAssignedUsers.map((u) => u.name).join(", ");
 
     for (const admin of admins) {
       await Notification.create({
@@ -96,7 +109,6 @@ const addCase = async (req, res) => {
     });
   }
 };
-
 
 const getCases = async (req, res) => {
   try {
@@ -151,7 +163,12 @@ const updateCase = async (req, res) => {
     }
 
     // Step 1: Track changes
-    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
+    const excludedKeys = [
+      "lastUpdate",
+      "updatedAt",
+      "assignedUsers",
+      "services",
+    ];
     const changes = [];
 
     for (const key in otherFields) {
@@ -171,15 +188,21 @@ const updateCase = async (req, res) => {
 
     // Compare status separately
     if (status && status !== existingCase.status) {
-      changes.push(`status changed from "${existingCase.status}" to "${status}"`);
+      changes.push(
+        `status changed from "${existingCase.status}" to "${status}"`
+      );
     }
 
     // Compare assignedUsers
     const newUserIds = Array.isArray(assignedUsers)
-      ? assignedUsers.map((u) => (typeof u === "object" ? u._id.toString() : u.toString()))
+      ? assignedUsers.map((u) =>
+          typeof u === "object" ? u._id.toString() : u.toString()
+        )
       : [];
 
-    const oldUserIds = (existingCase.assignedUsers || []).map((u) => u._id.toString());
+    const oldUserIds = (existingCase.assignedUsers || []).map((u) =>
+      u._id.toString()
+    );
     const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
     const removedUserIds = oldUserIds.filter((id) => !newUserIds.includes(id));
 
@@ -188,10 +211,14 @@ const updateCase = async (req, res) => {
     }
 
     // Step 2: Fetch full user details for assignedUsers
-    const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select("userId name");
+    const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select(
+      "userId name"
+    );
 
     const formattedAssignedUsers = newUserIds.map((userId) => {
-      const user = usersFromDb.find((u) => u._id.toString() === userId.toString());
+      const user = usersFromDb.find(
+        (u) => u._id.toString() === userId.toString()
+      );
       return {
         _id: user ? user._id : userId,
         userId: user ? user.userId : null,
@@ -199,18 +226,46 @@ const updateCase = async (req, res) => {
       };
     });
 
-    // Step 3: Update the case
-    const updated = await Case.findByIdAndUpdate(
-      caseId,
-      {
-        ...otherFields,
-        assignedUsers: formattedAssignedUsers,
-        status: status || existingCase.status,
-        lastUpdate: new Date(),
-      },
-      { new: true, runValidators: true }
-    );
+    // Determine services array for update
+    const updatedServices = otherFields.services || existingCase.services;
 
+    const totalServices = updatedServices.length;
+    const completedCount = updatedServices.filter(
+      (s) => s.status === "Completed"
+    ).length;
+
+    const base = 50;
+    const remaining = 50;
+
+    const overallCompletionPercentage =
+      totalServices === 0
+        ? 50
+        : Math.min(base + (completedCount * remaining) / totalServices, 100);
+
+    // Step 3: Update the case
+    // Build the update payload with all fields
+    const updatePayload = {
+      srNo,
+      ownerName,
+      clientName,
+      unitName,
+      franchiseAddress,
+      promoters,
+      authorizedPerson,
+      services,
+      assignedUsers: formattedAssignedUsers,
+      reasonForStatus,
+      status: status || existingCase.status,
+      overallCompletionPercentage,
+      overallStatus: status || existingCase.status, // or calculate separately if needed
+      lastUpdate: new Date(),
+    };
+
+    // Update and return new doc
+    const updated = await Case.findByIdAndUpdate(caseId, updatePayload, {
+      new: true,
+      runValidators: true,
+    });
     // Step 4: Notify assigned users
     const changeMessage =
       changes.length > 0
@@ -231,11 +286,11 @@ const updateCase = async (req, res) => {
     res.json({ message: "Case updated successfully", case: updated });
   } catch (err) {
     console.error("Error updating case:", err);
-    res.status(500).json({ message: "Failed to update case", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update case", error: err.message });
   }
 };
-
-
 
 const deleteCase = async (req, res) => {
   try {
@@ -246,12 +301,15 @@ const deleteCase = async (req, res) => {
     }
 
     // Assuming req.user contains the logged-in user
-    const deleterName = req.user?.name || 'Someone';
+    const deleterName = req.user?.name || "Someone";
 
-    if (Array.isArray(deleted.assignedUsers) && deleted.assignedUsers.length > 0) {
+    if (
+      Array.isArray(deleted.assignedUsers) &&
+      deleted.assignedUsers.length > 0
+    ) {
       for (const assignedUser of deleted.assignedUsers) {
         await Notification.create({
-          type: 'deletion', // confirm enum value matches schema
+          type: "deletion", // confirm enum value matches schema
           message: `Case "${deleted.unitName}" has been deleted by ${deleterName}.`,
           userId: assignedUser._id,
           userName: assignedUser.name || null,
@@ -264,10 +322,10 @@ const deleteCase = async (req, res) => {
     res.json({ message: "Case deleted successfully" });
   } catch (err) {
     console.error("Error deleting case:", err);
-    res.status(500).json({ message: "Failed to delete case", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete case", error: err.message });
   }
 };
-
-
 
 module.exports = { addCase, getCases, getcase, updateCase, deleteCase };

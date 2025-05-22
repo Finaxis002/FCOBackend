@@ -47,7 +47,32 @@ const caseSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  overallCompletionPercentage: {
+  type: Number,
+  default: 50, // Starts at 50% for new cases
+},
 });
+
+
+caseSchema.virtual("calculatedCompletionPercentage").get(function () {
+  const totalServices = this.services.length;
+  if (totalServices === 0) return 50; // default for new case
+
+  const completedCount = this.services.filter(
+    (s) => s.status === "Completed"
+  ).length;
+
+  const base = 50;
+  const remaining = 50;
+  const increment = (completedCount * remaining) / totalServices;
+
+  return Math.min(base + increment, 100);
+});
+
+// Enable virtuals in JSON output
+caseSchema.set("toJSON", { virtuals: true });
+caseSchema.set("toObject", { virtuals: true });
+
 
 // Make sure this line is present and correct
 module.exports = mongoose.model("Case", caseSchema);
