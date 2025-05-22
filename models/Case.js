@@ -14,7 +14,7 @@ const caseSchema = new mongoose.Schema({
       name: String,
       status: {
         type: String,
-        default: "Pending",
+        default: "To-be-Started",
       },
       remarks: {
         type: String,
@@ -28,8 +28,8 @@ const caseSchema = new mongoose.Schema({
   ],
   status: {
     type: String,
-    enum: ["Pending", "In-Progress", "Completed", "Rejected", "Approved"],
-    default: "Pending",
+    enum: ["New-Case", "In-Progress", "Completed", "Rejected", "Approved"],
+    default: "New-Case",
   },
    assignedUsers: [
   {

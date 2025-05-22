@@ -50,8 +50,8 @@ const addCase = async (req, res) => {
       services,
       assignedUsers: formattedAssignedUsers,
       reasonForStatus,
-      overallStatus: status || "Pending",
-      status: status || "Pending",
+      overallStatus: status || "To-be-Started",
+      status: status || "New-Case",
       lastUpdate: new Date(),
     });
 
