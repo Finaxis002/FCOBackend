@@ -1,6 +1,8 @@
 const Case = require("../models/Case.js");
 const User = require("../models/User.js");
 const Notification = require("../models/Notification");
+const Admin = require('../models/Admin'); // adjust path if needed
+
 
 const addCase = async (req, res) => {
   try {
@@ -18,17 +20,14 @@ const addCase = async (req, res) => {
       status,
     } = req.body;
 
-    // First extract just the IDs if assignedUsers contains objects
     const userIds = Array.isArray(assignedUsers)
       ? assignedUsers.map((u) => (typeof u === "object" ? u._id : u))
       : [];
 
-    // Fetch full user details from DB for assigned users
     const usersFromDb = await User.find({
       _id: { $in: userIds },
     }).select("userId name");
 
-    // Map assignedUsers to include MongoDB _id, userId, and name
     const formattedAssignedUsers = userIds.map((userId) => {
       const user = usersFromDb.find(
         (u) => u._id.toString() === userId.toString()
@@ -57,25 +56,47 @@ const addCase = async (req, res) => {
     });
 
     const savedCase = await newCase.save();
-    
-    // Notify assigned users - now including names
+
+    // 🔔 Notify Assigned Users
     for (const assignedUser of formattedAssignedUsers) {
       await Notification.create({
         type: "creation",
         message: `You have been assigned to a new case: "${savedCase.unitName}".`,
         userId: assignedUser._id,
-        userName: assignedUser.name, // Add user name
+        userName: assignedUser.name,
         caseId: savedCase._id,
-        caseName: savedCase.unitName, // Add case name
+        caseName: savedCase.unitName,
       });
     }
-    
-    res.status(201).json({ message: "Case created successfully", case: savedCase });
+
+    // 🔔 Notify All Admins (optional: only Super Admins if needed)
+    const admins = await Admin.find().select("_id name"); // Adjust if you want only Super Admins
+    const assignedNames = formattedAssignedUsers.map(u => u.name).join(", ");
+
+    for (const admin of admins) {
+      await Notification.create({
+        type: "creation",
+        message: `A new case "${savedCase.unitName}" has been created and assigned to: ${assignedNames}.`,
+        userId: admin._id,
+        userName: admin.name,
+        caseId: savedCase._id,
+        caseName: savedCase.unitName,
+      });
+    }
+
+    res.status(201).json({
+      message: "Case created successfully",
+      case: savedCase,
+    });
   } catch (error) {
     console.error("Error adding case:", error);
-    res.status(500).json({ message: "Failed to create case", error: error.message });
+    res.status(500).json({
+      message: "Failed to create case",
+      error: error.message,
+    });
   }
 };
+
 
 const getCases = async (req, res) => {
   try {
@@ -122,21 +143,46 @@ const updateCase = async (req, res) => {
   try {
     const { assignedUsers, status, ...otherFields } = req.body;
 
-    // Extract just the IDs if assignedUsers contains objects
-    const userIds = Array.isArray(assignedUsers)
-      ? assignedUsers.map((u) => (typeof u === "object" ? u._id : u))
+    const caseId = req.params.id;
+    const existingCase = await Case.findById(caseId);
+
+    if (!existingCase) {
+      return res.status(404).json({ message: "Case not found" });
+    }
+
+    // Step 1: Track changes
+    const changes = [];
+
+    // Compare fields other than assignedUsers and status
+    for (const key in otherFields) {
+      if (existingCase[key] !== otherFields[key]) {
+        changes.push(`${key} changed from "${existingCase[key]}" to "${otherFields[key]}"`);
+      }
+    }
+
+    // Compare status
+    if (status && status !== existingCase.status) {
+      changes.push(`status changed from "${existingCase.status}" to "${status}"`);
+    }
+
+    // Compare assignedUsers
+    const newUserIds = Array.isArray(assignedUsers)
+      ? assignedUsers.map((u) => (typeof u === "object" ? u._id.toString() : u.toString()))
       : [];
 
-    // Fetch full user details from DB for assigned users
-    const usersFromDb = await User.find({
-      _id: { $in: userIds },
-    }).select("userId name");
+    const oldUserIds = (existingCase.assignedUsers || []).map((u) => u._id.toString());
+    const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
+    const removedUserIds = oldUserIds.filter((id) => !newUserIds.includes(id));
 
-    // Map assignedUsers to include MongoDB _id, userId, and name
-    const formattedAssignedUsers = userIds.map((userId) => {
-      const user = usersFromDb.find(
-        (u) => u._id.toString() === userId.toString()
-      );
+    if (addedUserIds.length > 0 || removedUserIds.length > 0) {
+      changes.push("assigned users were modified");
+    }
+
+    // Step 2: Fetch full user details for assignedUsers
+    const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select("userId name");
+
+    const formattedAssignedUsers = newUserIds.map((userId) => {
+      const user = usersFromDb.find((u) => u._id.toString() === userId.toString());
       return {
         _id: user ? user._id : userId,
         userId: user ? user.userId : null,
@@ -144,34 +190,33 @@ const updateCase = async (req, res) => {
       };
     });
 
-    // 1. Update the case including assignedUsers and status
+    // Step 3: Save the case
     const updated = await Case.findByIdAndUpdate(
-      req.params.id,
+      caseId,
       {
         ...otherFields,
         assignedUsers: formattedAssignedUsers,
-        status: status || "Pending",
+        status: status || existingCase.status,
         lastUpdate: new Date(),
       },
       { new: true, runValidators: true }
     );
 
-    if (!updated) {
-      return res.status(404).json({ message: "Case not found" });
-    }
+    // Step 4: Notify assigned users with change summary
+    const changeMessage =
+      changes.length > 0
+        ? `Case "${updated.unitName}" updated: ${changes.join("; ")}.`
+        : `Case "${updated.unitName}" was updated.`;
 
-    // 2. Notify assigned users
-    if (formattedAssignedUsers.length > 0) {
-      for (const assignedUser of formattedAssignedUsers) {
-        await Notification.create({
-          type: "update", // ensure this matches your enum in Notification schema
-          message: `Case has been updated: "${updated.unitName}".`,
-          userId: assignedUser._id,
-          userName: assignedUser.name,
-          caseId: updated._id,
-          caseName: updated.unitName,
-        });
-      }
+    for (const assignedUser of formattedAssignedUsers) {
+      await Notification.create({
+        type: "update",
+        message: changeMessage,
+        userId: assignedUser._id,
+        userName: assignedUser.name,
+        caseId: updated._id,
+        caseName: updated.unitName,
+      });
     }
 
     res.json({ message: "Case updated successfully", case: updated });
@@ -180,6 +225,7 @@ const updateCase = async (req, res) => {
     res.status(500).json({ message: "Failed to update case", error: err.message });
   }
 };
+
 
 
 const deleteCase = async (req, res) => {
