@@ -151,16 +151,25 @@ const updateCase = async (req, res) => {
     }
 
     // Step 1: Track changes
+    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
     const changes = [];
 
-    // Compare fields other than assignedUsers and status
     for (const key in otherFields) {
-      if (existingCase[key] !== otherFields[key]) {
-        changes.push(`${key} changed from "${existingCase[key]}" to "${otherFields[key]}"`);
+      if (excludedKeys.includes(key)) continue;
+
+      const oldVal = existingCase[key];
+      const newVal = otherFields[key];
+
+      if (
+        oldVal !== newVal &&
+        typeof oldVal !== "object" &&
+        typeof newVal !== "object"
+      ) {
+        changes.push(`${key} changed from "${oldVal}" to "${newVal}"`);
       }
     }
 
-    // Compare status
+    // Compare status separately
     if (status && status !== existingCase.status) {
       changes.push(`status changed from "${existingCase.status}" to "${status}"`);
     }
@@ -190,7 +199,7 @@ const updateCase = async (req, res) => {
       };
     });
 
-    // Step 3: Save the case
+    // Step 3: Update the case
     const updated = await Case.findByIdAndUpdate(
       caseId,
       {
@@ -202,10 +211,10 @@ const updateCase = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Step 4: Notify assigned users with change summary
+    // Step 4: Notify assigned users
     const changeMessage =
       changes.length > 0
-        ? `Case "${updated.unitName}" updated: ${changes.join("; ")}.`
+        ? `Case "${updated.unitName}" updated:\n${changes.join(";\n")}`
         : `Case "${updated.unitName}" was updated.`;
 
     for (const assignedUser of formattedAssignedUsers) {

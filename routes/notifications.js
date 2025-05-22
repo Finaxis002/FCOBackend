@@ -65,7 +65,8 @@ router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const notif = await Notification.findOneAndDelete({
       _id: req.params.id,
-      userId: req.user._id,
+      userId: req.user._id.toString(),
+
     });
     if (!notif)
       return res.status(404).json({ message: "Notification not found" });
