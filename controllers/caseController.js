@@ -167,7 +167,7 @@ const updateCase = async (req, res) => {
       promoters,
       authorizedPerson,
       services,
-      assignedUsers,
+      assignedUsers, // may be undefined or empty if not sent
       reasonForStatus,
       status,
     } = req.body;
@@ -179,18 +179,16 @@ const updateCase = async (req, res) => {
       return res.status(404).json({ message: "Case not found" });
     }
 
-    // Step 1: Track changes
+    // Step 1: Track changes except excluded keys
     const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
     const changes = [];
 
-    // Loop over all keys in req.body for change detection
     for (const key in req.body) {
       if (excludedKeys.includes(key)) continue;
 
       const oldVal = existingCase[key];
       const newVal = req.body[key];
 
-      // Only compare primitives (non-objects)
       if (
         oldVal !== newVal &&
         typeof oldVal !== "object" &&
@@ -205,38 +203,43 @@ const updateCase = async (req, res) => {
       changes.push(`status changed from "${existingCase.status}" to "${status}"`);
     }
 
-    // Compare assignedUsers
-    const newUserIds = Array.isArray(assignedUsers)
-      ? assignedUsers.map((u) =>
-          typeof u === "object" ? u._id.toString() : u.toString()
-        )
-      : [];
+    // Step 2: Process assignedUsers only if provided; else keep existing
+    let formattedAssignedUsers;
 
-    const oldUserIds = (existingCase.assignedUsers || []).map((u) =>
-      u._id.toString()
-    );
-    const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
-    const removedUserIds = oldUserIds.filter((id) => !newUserIds.includes(id));
-
-    if (addedUserIds.length > 0 || removedUserIds.length > 0) {
-      changes.push("assigned users were modified");
-    }
-
-    // Step 2: Fetch full user details for assignedUsers
-    const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select(
-      "userId name"
-    );
-
-    const formattedAssignedUsers = newUserIds.map((userId) => {
-      const user = usersFromDb.find(
-        (u) => u._id.toString() === userId.toString()
+    if (Array.isArray(assignedUsers)) {
+      const newUserIds = assignedUsers.map((u) =>
+        typeof u === "object" ? u._id.toString() : u.toString()
       );
-      return {
-        _id: user ? user._id : userId,
-        userId: user ? user.userId : null,
-        name: user ? user.name : `User ${userId}`,
-      };
-    });
+
+      const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select(
+        "userId name"
+      );
+
+      formattedAssignedUsers = newUserIds.map((userId) => {
+        const user = usersFromDb.find(
+          (u) => u._id.toString() === userId.toString()
+        );
+        return {
+          _id: user ? user._id : userId,
+          userId: user ? user.userId : null,
+          name: user ? user.name : `User ${userId}`,
+        };
+      });
+
+      // Track assignedUsers changes
+      const oldUserIds = (existingCase.assignedUsers || []).map((u) =>
+        u._id.toString()
+      );
+      const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
+      const removedUserIds = oldUserIds.filter((id) => !newUserIds.includes(id));
+
+      if (addedUserIds.length > 0 || removedUserIds.length > 0) {
+        changes.push("assigned users were modified");
+      }
+    } else {
+      // assignedUsers not sent, keep existing
+      formattedAssignedUsers = existingCase.assignedUsers;
+    }
 
     // Step 3: Calculate overallCompletionPercentage based on services array
     const totalServices = services ? services.length : existingCase.services.length;
@@ -270,13 +273,13 @@ const updateCase = async (req, res) => {
       lastUpdate: new Date(),
     };
 
-    // Step 5: Update case document
+    // Step 5: Update case document in DB
     const updated = await Case.findByIdAndUpdate(caseId, updatePayload, {
       new: true,
       runValidators: true,
     });
 
-    // Step 6: Notify assigned users
+    // Step 6: Notify assigned users about the update
     const changeMessage =
       changes.length > 0
         ? `Case "${updated.unitName}" updated:\n${changes.join(";\n")}`
