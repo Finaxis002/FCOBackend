@@ -154,7 +154,6 @@ const getcase = async (req, res) => {
   }
 };
 
-
 // ✅ PUT - Update case by ID
 const updateCase = async (req, res) => {
   try {
@@ -180,7 +179,12 @@ const updateCase = async (req, res) => {
     }
 
     // Step 1: Track changes except excluded keys
-    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
+    const excludedKeys = [
+      "lastUpdate",
+      "updatedAt",
+      "assignedUsers",
+      "services",
+    ];
     const changes = [];
 
     for (const key in req.body) {
@@ -200,7 +204,25 @@ const updateCase = async (req, res) => {
 
     // Compare status separately
     if (status && status !== existingCase.status) {
-      changes.push(`status changed from "${existingCase.status}" to "${status}"`);
+      changes.push(
+        `status changed from "${existingCase.status}" to "${status}"`
+      );
+    }
+
+    // Detect if any service status changed
+    const hasServiceStatusChanged = (oldServices, newServices) => {
+      if (!oldServices || !newServices) return false;
+      if (oldServices.length !== newServices.length) return true;
+
+      for (let i = 0; i < oldServices.length; i++) {
+        if (oldServices[i].id !== newServices[i].id) return true;
+        if (oldServices[i].status !== newServices[i].status) return true;
+      }
+      return false;
+    };
+
+    if (hasServiceStatusChanged(existingCase.services, services)) {
+      changes.push("service status updated");
     }
 
     // Step 2: Process assignedUsers only if provided; else keep existing
@@ -231,7 +253,9 @@ const updateCase = async (req, res) => {
         u._id.toString()
       );
       const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
-      const removedUserIds = oldUserIds.filter((id) => !newUserIds.includes(id));
+      const removedUserIds = oldUserIds.filter(
+        (id) => !newUserIds.includes(id)
+      );
 
       if (addedUserIds.length > 0 || removedUserIds.length > 0) {
         changes.push("assigned users were modified");
@@ -242,7 +266,9 @@ const updateCase = async (req, res) => {
     }
 
     // Step 3: Calculate overallCompletionPercentage based on services array
-    const totalServices = services ? services.length : existingCase.services.length;
+    const totalServices = services
+      ? services.length
+      : existingCase.services.length;
     const completedCount = services
       ? services.filter((s) => s.status === "Completed").length
       : existingCase.services.filter((s) => s.status === "Completed").length;
@@ -299,11 +325,11 @@ const updateCase = async (req, res) => {
     res.json({ message: "Case updated successfully", case: updated });
   } catch (err) {
     console.error("Error updating case:", err);
-    res.status(500).json({ message: "Failed to update case", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update case", error: err.message });
   }
 };
-
-
 
 const deleteCase = async (req, res) => {
   try {
