@@ -63,27 +63,42 @@ router.put("/:id/read", authMiddleware, async (req, res) => {
 // Delete notification
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
-    const notif = await Notification.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id.toString(),
+    const role = (req.userRole || req.user.role || "").toLowerCase();
 
-    });
-    if (!notif)
+    const filter = {
+      _id: req.params.id,
+      ...(role !== "admin" && role !== "super admin" && { userId: req.user._id.toString() }),
+    };
+
+    const notif = await Notification.findOneAndDelete(filter);
+
+    if (!notif) {
       return res.status(404).json({ message: "Notification not found" });
+    }
+
     res.json({ message: "Notification deleted" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting notification" });
   }
 });
 
+
 // Delete all notifications for user (optional)
 router.delete("/", authMiddleware, async (req, res) => {
   try {
-    await Notification.deleteMany({ userId: req.user._id });
+    const role = (req.userRole || req.user.role || "").toLowerCase();
+
+    const filter =
+      role === "admin" || role === "super admin"
+        ? {} // delete all notifications
+        : { userId: req.user._id.toString() }; // delete only own
+
+    await Notification.deleteMany(filter);
     res.json({ message: "All notifications deleted" });
   } catch (err) {
     res.status(500).json({ message: "Error deleting notifications" });
   }
 });
+
 
 module.exports = router;
