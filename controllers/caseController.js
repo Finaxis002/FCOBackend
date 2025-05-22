@@ -136,24 +136,41 @@ const getcase = async (req, res) => {
     const found = await Case.findById(req.params.id);
     if (!found) return res.status(404).json({ message: "Case not found" });
 
-    // Convert legacy format if needed
-    const formattedCase = {
-      ...found._doc,
-      assignedUsers: found.assignedUsers.map((u) =>
-        typeof u === "string" ? { _id: u, name: u } : u
-      ),
+    // assignedUsers formatting (your existing code)
+    const assignedUsersFormatted = found.assignedUsers.map((u) =>
+      typeof u === "string" ? { _id: u, name: u } : u
+    );
+
+    // Prepare response object using virtual calculatedCompletionPercentage
+    const response = {
+      ...found.toObject(), // toObject includes virtuals because of your schema setting
+      assignedUsers: assignedUsersFormatted,
+      overallCompletionPercentage: found.calculatedCompletionPercentage, // override with virtual
     };
 
-    res.json(formattedCase);
+    res.json(response);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 // ✅ PUT - Update case by ID
 const updateCase = async (req, res) => {
   try {
-    const { assignedUsers, status, ...otherFields } = req.body;
+    const {
+      srNo,
+      ownerName,
+      clientName,
+      unitName,
+      franchiseAddress,
+      promoters,
+      authorizedPerson,
+      services,
+      assignedUsers,
+      reasonForStatus,
+      status,
+    } = req.body;
 
     const caseId = req.params.id;
     const existingCase = await Case.findById(caseId);
@@ -163,20 +180,17 @@ const updateCase = async (req, res) => {
     }
 
     // Step 1: Track changes
-    const excludedKeys = [
-      "lastUpdate",
-      "updatedAt",
-      "assignedUsers",
-      "services",
-    ];
+    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
     const changes = [];
 
-    for (const key in otherFields) {
+    // Loop over all keys in req.body for change detection
+    for (const key in req.body) {
       if (excludedKeys.includes(key)) continue;
 
       const oldVal = existingCase[key];
-      const newVal = otherFields[key];
+      const newVal = req.body[key];
 
+      // Only compare primitives (non-objects)
       if (
         oldVal !== newVal &&
         typeof oldVal !== "object" &&
@@ -188,9 +202,7 @@ const updateCase = async (req, res) => {
 
     // Compare status separately
     if (status && status !== existingCase.status) {
-      changes.push(
-        `status changed from "${existingCase.status}" to "${status}"`
-      );
+      changes.push(`status changed from "${existingCase.status}" to "${status}"`);
     }
 
     // Compare assignedUsers
@@ -226,13 +238,11 @@ const updateCase = async (req, res) => {
       };
     });
 
-    // Determine services array for update
-    const updatedServices = otherFields.services || existingCase.services;
-
-    const totalServices = updatedServices.length;
-    const completedCount = updatedServices.filter(
-      (s) => s.status === "Completed"
-    ).length;
+    // Step 3: Calculate overallCompletionPercentage based on services array
+    const totalServices = services ? services.length : existingCase.services.length;
+    const completedCount = services
+      ? services.filter((s) => s.status === "Completed").length
+      : existingCase.services.filter((s) => s.status === "Completed").length;
 
     const base = 50;
     const remaining = 50;
@@ -242,8 +252,7 @@ const updateCase = async (req, res) => {
         ? 50
         : Math.min(base + (completedCount * remaining) / totalServices, 100);
 
-    // Step 3: Update the case
-    // Build the update payload with all fields
+    // Step 4: Build update payload with all fields
     const updatePayload = {
       srNo,
       ownerName,
@@ -257,16 +266,17 @@ const updateCase = async (req, res) => {
       reasonForStatus,
       status: status || existingCase.status,
       overallCompletionPercentage,
-      overallStatus: status || existingCase.status, // or calculate separately if needed
+      overallStatus: status || existingCase.status,
       lastUpdate: new Date(),
     };
 
-    // Update and return new doc
+    // Step 5: Update case document
     const updated = await Case.findByIdAndUpdate(caseId, updatePayload, {
       new: true,
       runValidators: true,
     });
-    // Step 4: Notify assigned users
+
+    // Step 6: Notify assigned users
     const changeMessage =
       changes.length > 0
         ? `Case "${updated.unitName}" updated:\n${changes.join(";\n")}`
@@ -286,11 +296,11 @@ const updateCase = async (req, res) => {
     res.json({ message: "Case updated successfully", case: updated });
   } catch (err) {
     console.error("Error updating case:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to update case", error: err.message });
+    res.status(500).json({ message: "Failed to update case", error: err.message });
   }
 };
+
+
 
 const deleteCase = async (req, res) => {
   try {
