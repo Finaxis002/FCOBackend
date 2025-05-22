@@ -154,31 +154,45 @@ const getcase = async (req, res) => {
   }
 };
 
-const getServiceStatusChanges = (oldServices, newServices) => {
-  if (!oldServices || !newServices) return [];
-
+// ✅ PUT - Update case by ID
+const getServiceStatusChanges = (oldServices = [], newServices = []) => {
   const changes = [];
+  
+  // Create maps using service name as key (since IDs might be missing)
   const oldServicesMap = new Map();
-  oldServices.forEach((service) => oldServicesMap.set(service.id, service));
+  oldServices.forEach(service => {
+    oldServicesMap.set(service.name.toLowerCase(), service);
+  });
 
-  newServices.forEach((newService) => {
-    const oldService = oldServicesMap.get(newService.id);
-    if (!oldService) {
-      // Optional: new service added
-      changes.push(
-        `Service "${newService.name}" was added with status "${newService.status}".`
-      );
-    } else if (oldService.status !== newService.status) {
-      changes.push(
-        `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`
-      );
+  const newServicesMap = new Map();
+  newServices.forEach(service => {
+    newServicesMap.set(service.name.toLowerCase(), service);
+  });
+
+  // Check for added services (only notify about truly new services)
+  newServicesMap.forEach((newService, key) => {
+    if (!oldServicesMap.has(key)) {
+      changes.push({
+        type: 'service-added',
+        message: `Service "${newService.name}" was added with status "${newService.status}".`
+      });
+    }
+  });
+
+  // Check for status changes
+  newServicesMap.forEach((newService, key) => {
+    const oldService = oldServicesMap.get(key);
+    if (oldService && oldService.status !== newService.status) {
+      changes.push({
+        type: 'service-status',
+        message: `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`
+      });
     }
   });
 
   return changes;
 };
 
-// ✅ PUT - Update case by ID
 const updateCase = async (req, res) => {
   try {
     const {
@@ -190,7 +204,7 @@ const updateCase = async (req, res) => {
       promoters,
       authorizedPerson,
       services,
-      assignedUsers, // may be undefined or empty if not sent
+      assignedUsers,
       reasonForStatus,
       status,
     } = req.body;
@@ -202,73 +216,52 @@ const updateCase = async (req, res) => {
       return res.status(404).json({ message: "Case not found" });
     }
 
-    // Step 1: Track changes except excluded keys
-    const excludedKeys = [
-      "lastUpdate",
-      "updatedAt",
-      "assignedUsers",
-      "services",
-    ];
+    // Track changes
     const changes = [];
+    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
 
+    // Track simple field changes
     for (const key in req.body) {
       if (excludedKeys.includes(key)) continue;
 
       const oldVal = existingCase[key];
       const newVal = req.body[key];
 
-      if (
-        oldVal !== newVal &&
-        typeof oldVal !== "object" &&
-        typeof newVal !== "object"
-      ) {
-        changes.push(`${key} changed from "${oldVal}" to "${newVal}"`);
+      if (oldVal !== newVal && typeof oldVal !== 'object' && typeof newVal !== 'object') {
+        changes.push({
+          type: 'field-change',
+          message: `${key} changed from "${oldVal}" to "${newVal}"`
+        });
       }
     }
 
-    // Compare status separately
+    // Track status separately
     if (status && status !== existingCase.status) {
-      changes.push(
-        `status changed from "${existingCase.status}" to "${status}"`
-      );
+      changes.push({
+        type: 'status-change',
+        message: `status changed from "${existingCase.status}" to "${status}"`
+      });
     }
 
-    // Detect if any service status changed
-    const hasServiceStatusChanged = (oldServices, newServices) => {
-      if (!oldServices || !newServices) return false;
-      if (oldServices.length !== newServices.length) return true;
-
-      for (let i = 0; i < oldServices.length; i++) {
-        if (oldServices[i].id !== newServices[i].id) return true;
-        if (oldServices[i].status !== newServices[i].status) return true;
-      }
-      return false;
-    };
-
-    const serviceStatusChanges = getServiceStatusChanges(
-      existingCase.services,
-      services
-    );
-    if (serviceStatusChanges.length > 0) {
+    // Only check service changes if services were provided in the request
+    if (services !== undefined) {
+      const serviceStatusChanges = getServiceStatusChanges(
+        existingCase.services || [],
+        services || []
+      );
       changes.push(...serviceStatusChanges);
     }
 
-    // Step 2: Process assignedUsers only if provided; else keep existing
-    let formattedAssignedUsers;
-
+    // Process assignedUsers
+    let formattedAssignedUsers = existingCase.assignedUsers;
     if (Array.isArray(assignedUsers)) {
-      const newUserIds = assignedUsers.map((u) =>
-        typeof u === "object" ? u._id.toString() : u.toString()
+      const newUserIds = assignedUsers.map(u => 
+        typeof u === 'object' ? u._id.toString() : u.toString()
       );
 
-      const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select(
-        "userId name"
-      );
-
-      formattedAssignedUsers = newUserIds.map((userId) => {
-        const user = usersFromDb.find(
-          (u) => u._id.toString() === userId.toString()
-        );
+      const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select("userId name");
+      formattedAssignedUsers = newUserIds.map(userId => {
+        const user = usersFromDb.find(u => u._id.toString() === userId.toString());
         return {
           _id: user ? user._id : userId,
           userId: user ? user.userId : null,
@@ -276,89 +269,98 @@ const updateCase = async (req, res) => {
         };
       });
 
-      // Track assignedUsers changes
-      const oldUserIds = (existingCase.assignedUsers || []).map((u) =>
-        u._id.toString()
-      );
-      const addedUserIds = newUserIds.filter((id) => !oldUserIds.includes(id));
-      const removedUserIds = oldUserIds.filter(
-        (id) => !newUserIds.includes(id)
-      );
+      // Track user changes
+      const oldUserIds = existingCase.assignedUsers.map(u => u._id.toString());
+      const addedUsers = newUserIds.filter(id => !oldUserIds.includes(id));
+      const removedUsers = oldUserIds.filter(id => !newUserIds.includes(id));
 
-      if (addedUserIds.length > 0 || removedUserIds.length > 0) {
-        changes.push("assigned users were modified");
+      if (addedUsers.length > 0) {
+        changes.push({
+          type: 'user-added',
+          message: `${addedUsers.length} user(s) added to case`
+        });
       }
-    } else {
-      // assignedUsers not sent, keep existing
-      formattedAssignedUsers = existingCase.assignedUsers;
+      if (removedUsers.length > 0) {
+        changes.push({
+          type: 'user-removed',
+          message: `${removedUsers.length} user(s) removed from case`
+        });
+      }
     }
 
-    // Step 3: Calculate overallCompletionPercentage based on services array
-    const totalServices = services
-      ? services.length
-      : existingCase.services.length;
-    const completedCount = services
-      ? services.filter((s) => s.status === "Completed").length
-      : existingCase.services.filter((s) => s.status === "Completed").length;
+    // Calculate completion percentage
+    const servicesToUse = services !== undefined ? services : existingCase.services;
+    const totalServices = servicesToUse.length;
+    const completedCount = servicesToUse.filter(s => s.status === "Completed").length;
+    const overallCompletionPercentage = totalServices === 0 ? 50 : 
+      Math.min(50 + (completedCount * 50) / totalServices, 100);
 
-    const base = 50;
-    const remaining = 50;
-
-    const overallCompletionPercentage =
-      totalServices === 0
-        ? 50
-        : Math.min(base + (completedCount * remaining) / totalServices, 100);
-
-    // Step 4: Build update payload with all fields
+    // Build update payload
     const updatePayload = {
-      srNo,
-      ownerName,
-      clientName,
-      unitName,
-      franchiseAddress,
-      promoters,
-      authorizedPerson,
-      services,
+      srNo: srNo !== undefined ? srNo : existingCase.srNo,
+      ownerName: ownerName !== undefined ? ownerName : existingCase.ownerName,
+      clientName: clientName !== undefined ? clientName : existingCase.clientName,
+      unitName: unitName !== undefined ? unitName : existingCase.unitName,
+      franchiseAddress: franchiseAddress !== undefined 
+        ? franchiseAddress : existingCase.franchiseAddress,
+      promoters: promoters !== undefined ? promoters : existingCase.promoters,
+      authorizedPerson: authorizedPerson !== undefined 
+        ? authorizedPerson : existingCase.authorizedPerson,
+      services: services !== undefined ? services : existingCase.services,
       assignedUsers: formattedAssignedUsers,
-      reasonForStatus,
-      status: status || existingCase.status,
+      reasonForStatus: reasonForStatus !== undefined 
+        ? reasonForStatus : existingCase.reasonForStatus,
+      status: status !== undefined ? status : existingCase.status,
       overallCompletionPercentage,
-      overallStatus: status || existingCase.status,
+      overallStatus: status !== undefined ? status : existingCase.status,
       lastUpdate: new Date(),
     };
 
-    // Step 5: Update case document in DB
+    // Update case
     const updated = await Case.findByIdAndUpdate(caseId, updatePayload, {
       new: true,
       runValidators: true,
     });
 
-    // Step 6: Notify assigned users about the update
-    const changeMessage =
-      changes.length > 0
-        ? `Case "${updated.unitName}" updated:\n${changes.join(";\n")}`
-        : `Case "${updated.unitName}" was updated.`;
+    // Send notifications only if there are actual changes
+    if (changes.length > 0) {
+      // Filter out service-added notifications if this isn't the first update
+      const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
+      const filteredChanges = changes.filter(change => 
+        change.type !== 'service-added' || isFirstUpdate
+      );
 
-    for (const assignedUser of formattedAssignedUsers) {
-      await Notification.create({
-        type: "update",
-        message: changeMessage,
-        userId: assignedUser._id,
-        userName: assignedUser.name,
-        caseId: updated._id,
-        caseName: updated.unitName,
-      });
+      if (filteredChanges.length > 0) {
+        const changeMessage = `Case "${updated.unitName}" updated:\n${
+          filteredChanges.map(c => c.message).join(";\n")
+        }`;
+        
+        for (const assignedUser of formattedAssignedUsers) {
+          await Notification.create({
+            type: "update",
+            message: changeMessage,
+            userId: assignedUser._id,
+            userName: assignedUser.name,
+            caseId: updated._id,
+            caseName: updated.unitName,
+          });
+        }
+      }
     }
 
-    res.json({ message: "Case updated successfully", case: updated });
+    res.json({ 
+      message: "Case updated successfully", 
+      case: updated,
+      changes: changes.length > 0 ? changes.map(c => c.message) : ['No significant changes detected']
+    });
   } catch (err) {
     console.error("Error updating case:", err);
-    res
-      .status(500)
-      .json({ message: "Failed to update case", error: err.message });
+    res.status(500).json({ 
+      message: "Failed to update case", 
+      error: err.message 
+    });
   }
 };
-
 const deleteCase = async (req, res) => {
   try {
     const deleted = await Case.findByIdAndDelete(req.params.id);
