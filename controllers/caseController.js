@@ -154,6 +154,30 @@ const getcase = async (req, res) => {
   }
 };
 
+const getServiceStatusChanges = (oldServices, newServices) => {
+  if (!oldServices || !newServices) return [];
+
+  const changes = [];
+  const oldServicesMap = new Map();
+  oldServices.forEach((service) => oldServicesMap.set(service.id, service));
+
+  newServices.forEach((newService) => {
+    const oldService = oldServicesMap.get(newService.id);
+    if (!oldService) {
+      // Optional: new service added
+      changes.push(
+        `Service "${newService.name}" was added with status "${newService.status}".`
+      );
+    } else if (oldService.status !== newService.status) {
+      changes.push(
+        `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`
+      );
+    }
+  });
+
+  return changes;
+};
+
 // ✅ PUT - Update case by ID
 const updateCase = async (req, res) => {
   try {
@@ -221,8 +245,12 @@ const updateCase = async (req, res) => {
       return false;
     };
 
-    if (hasServiceStatusChanged(existingCase.services, services)) {
-      changes.push("service status updated");
+    const serviceStatusChanges = getServiceStatusChanges(
+      existingCase.services,
+      services
+    );
+    if (serviceStatusChanges.length > 0) {
+      changes.push(...serviceStatusChanges);
     }
 
     // Step 2: Process assignedUsers only if provided; else keep existing
