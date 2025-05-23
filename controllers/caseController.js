@@ -2,6 +2,7 @@ const Case = require("../models/Case.js");
 const User = require("../models/User.js");
 const Notification = require("../models/Notification");
 const Admin = require("../models/Admin"); // adjust path if needed
+const notificationService = require("../services/notificationService");
 
 const addCase = async (req, res) => {
   try {
@@ -70,32 +71,37 @@ const addCase = async (req, res) => {
 
     const savedCase = await newCase.save();
 
-    // 🔔 Notify Assigned Users
-    for (const assignedUser of formattedAssignedUsers) {
-      await Notification.create({
-        type: "creation",
-        message: `You have been assigned to a new case: "${savedCase.unitName}".`,
-        userId: assignedUser._id,
-        userName: assignedUser.name,
-        caseId: savedCase._id,
-        caseName: savedCase.unitName,
-      });
-    }
+    // // 🔔 Notify Assigned Users
+    // for (const assignedUser of formattedAssignedUsers) {
+    //   await Notification.create({
+    //     type: "creation",
+    //     message: `You have been assigned to a new case: "${savedCase.unitName}".`,
+    //     userId: assignedUser._id,
+    //     userName: assignedUser.name,
+    //     caseId: savedCase._id,
+    //     caseName: savedCase.unitName,
+    //   });
+    // }
 
-    // 🔔 Notify All Admins (optional: only Super Admins if needed)
-    const admins = await Admin.find().select("_id name"); // Adjust if you want only Super Admins
-    const assignedNames = formattedAssignedUsers.map((u) => u.name).join(", ");
+    // // 🔔 Notify All Admins (optional: only Super Admins if needed)
+    // const admins = await Admin.find().select("_id name"); // Adjust if you want only Super Admins
+    // const assignedNames = formattedAssignedUsers.map((u) => u.name).join(", ");
 
-    for (const admin of admins) {
-      await Notification.create({
-        type: "creation",
-        message: `A new case "${savedCase.unitName}" has been created and assigned to: ${assignedNames}.`,
-        userId: admin._id,
-        userName: admin.name,
-        caseId: savedCase._id,
-        caseName: savedCase.unitName,
-      });
-    }
+    // for (const admin of admins) {
+    //   await Notification.create({
+    //     type: "creation",
+    //     message: `A new case "${savedCase.unitName}" has been created and assigned to: ${assignedNames}.`,
+    //     userId: admin._id,
+    //     userName: admin.name,
+    //     caseId: savedCase._id,
+    //     caseName: savedCase.unitName,
+    //   });
+    // }
+
+
+      // Use notification service
+    await notificationService.notifyCaseCreation(savedCase, formattedAssignedUsers);
+
 
     res.status(201).json({
       message: "Case created successfully",
@@ -376,31 +382,17 @@ const updateCase = async (req, res) => {
       runValidators: true,
     });
 
-    // Send notifications only if there are actual changes
-    if (changes.length > 0) {
-      // Filter out service-added notifications if this isn't the first update
-      const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
-      const filteredChanges = changes.filter(
-        (change) => change.type !== "service-added" || isFirstUpdate
-      );
+     // Use notification service
+    const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
+    const filteredChanges = changes.filter(
+      change => change.type !== "service-added" || isFirstUpdate
+    );
 
-      if (filteredChanges.length > 0) {
-        const changeMessage = `Case "${
-          updated.unitName
-        }" updated:\n${filteredChanges.map((c) => c.message).join(";\n")}`;
-
-        for (const assignedUser of formattedAssignedUsers) {
-          await Notification.create({
-            type: "update",
-            message: changeMessage,
-            userId: assignedUser._id,
-            userName: assignedUser.name,
-            caseId: updated._id,
-            caseName: updated.unitName,
-          });
-        }
-      }
-    }
+    await notificationService.notifyCaseUpdate(
+      updated, 
+      formattedAssignedUsers, 
+      filteredChanges
+    );
 
     res.json({
       message: "Case updated successfully",
@@ -432,21 +424,13 @@ const deleteCase = async (req, res) => {
     // Assuming req.user contains the logged-in user
     const deleterName = req.user?.name || "Someone";
 
-    if (
-      Array.isArray(deleted.assignedUsers) &&
-      deleted.assignedUsers.length > 0
-    ) {
-      for (const assignedUser of deleted.assignedUsers) {
-        await Notification.create({
-          type: "deletion", // confirm enum value matches schema
-          message: `Case "${deleted.unitName}" has been deleted by ${deleterName}.`,
-          userId: assignedUser._id,
-          userName: assignedUser.name || null,
-          caseId: deleted._id,
-          caseName: deleted.unitName,
-        });
-      }
-    }
+   // Use notification service
+    await notificationService.notifyCaseDeletion(
+      deleted, 
+      assignedUsers, 
+      deleterName
+    );
+
 
     res.json({ message: "Case deleted successfully" });
   } catch (err) {
