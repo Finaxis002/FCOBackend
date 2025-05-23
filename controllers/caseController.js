@@ -157,15 +157,15 @@ const getcase = async (req, res) => {
 // ✅ PUT - Update case by ID
 const getServiceStatusChanges = (oldServices = [], newServices = []) => {
   const changes = [];
-  
+
   // Create maps using service name as key (since IDs might be missing)
   const oldServicesMap = new Map();
-  oldServices.forEach(service => {
+  oldServices.forEach((service) => {
     oldServicesMap.set(service.name.toLowerCase(), service);
   });
 
   const newServicesMap = new Map();
-  newServices.forEach(service => {
+  newServices.forEach((service) => {
     newServicesMap.set(service.name.toLowerCase(), service);
   });
 
@@ -173,8 +173,8 @@ const getServiceStatusChanges = (oldServices = [], newServices = []) => {
   newServicesMap.forEach((newService, key) => {
     if (!oldServicesMap.has(key)) {
       changes.push({
-        type: 'service-added',
-        message: `Service "${newService.name}" was added with status "${newService.status}".`
+        type: "service-added",
+        message: `Service "${newService.name}" was added with status "${newService.status}".`,
       });
     }
   });
@@ -184,8 +184,8 @@ const getServiceStatusChanges = (oldServices = [], newServices = []) => {
     const oldService = oldServicesMap.get(key);
     if (oldService && oldService.status !== newService.status) {
       changes.push({
-        type: 'service-status',
-        message: `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`
+        type: "service-status",
+        message: `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`,
       });
     }
   });
@@ -218,7 +218,12 @@ const updateCase = async (req, res) => {
 
     // Track changes
     const changes = [];
-    const excludedKeys = ["lastUpdate", "updatedAt", "assignedUsers", "services"];
+    const excludedKeys = [
+      "lastUpdate",
+      "updatedAt",
+      "assignedUsers",
+      "services",
+    ];
 
     // Track simple field changes
     for (const key in req.body) {
@@ -227,10 +232,14 @@ const updateCase = async (req, res) => {
       const oldVal = existingCase[key];
       const newVal = req.body[key];
 
-      if (oldVal !== newVal && typeof oldVal !== 'object' && typeof newVal !== 'object') {
+      if (
+        oldVal !== newVal &&
+        typeof oldVal !== "object" &&
+        typeof newVal !== "object"
+      ) {
         changes.push({
-          type: 'field-change',
-          message: `${key} changed from "${oldVal}" to "${newVal}"`
+          type: "field-change",
+          message: `${key} changed from "${oldVal}" to "${newVal}"`,
         });
       }
     }
@@ -238,8 +247,8 @@ const updateCase = async (req, res) => {
     // Track status separately
     if (status && status !== existingCase.status) {
       changes.push({
-        type: 'status-change',
-        message: `status changed from "${existingCase.status}" to "${status}"`
+        type: "status-change",
+        message: `status changed from "${existingCase.status}" to "${status}"`,
       });
     }
 
@@ -255,13 +264,17 @@ const updateCase = async (req, res) => {
     // Process assignedUsers
     let formattedAssignedUsers = existingCase.assignedUsers;
     if (Array.isArray(assignedUsers)) {
-      const newUserIds = assignedUsers.map(u => 
-        typeof u === 'object' ? u._id.toString() : u.toString()
+      const newUserIds = assignedUsers.map((u) =>
+        typeof u === "object" ? u._id.toString() : u.toString()
       );
 
-      const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select("userId name");
-      formattedAssignedUsers = newUserIds.map(userId => {
-        const user = usersFromDb.find(u => u._id.toString() === userId.toString());
+      const usersFromDb = await User.find({ _id: { $in: newUserIds } }).select(
+        "userId name"
+      );
+      formattedAssignedUsers = newUserIds.map((userId) => {
+        const user = usersFromDb.find(
+          (u) => u._id.toString() === userId.toString()
+        );
         return {
           _id: user ? user._id : userId,
           userId: user ? user.userId : null,
@@ -270,35 +283,42 @@ const updateCase = async (req, res) => {
       });
 
       // Track user changes
-      const oldUserIds = existingCase.assignedUsers.map(u => u._id.toString());
-      const addedUsers = newUserIds.filter(id => !oldUserIds.includes(id));
-      const removedUsers = oldUserIds.filter(id => !newUserIds.includes(id));
+      const oldUserIds = existingCase.assignedUsers.map((u) =>
+        u._id.toString()
+      );
+      const addedUsers = newUserIds.filter((id) => !oldUserIds.includes(id));
+      const removedUsers = oldUserIds.filter((id) => !newUserIds.includes(id));
 
       if (addedUsers.length > 0) {
         changes.push({
-          type: 'user-added',
-          message: `${addedUsers.length} user(s) added to case`
+          type: "user-added",
+          message: `${addedUsers.length} user(s) added to case`,
         });
       }
       if (removedUsers.length > 0) {
         changes.push({
-          type: 'user-removed',
-          message: `${removedUsers.length} user(s) removed from case`
+          type: "user-removed",
+          message: `${removedUsers.length} user(s) removed from case`,
         });
       }
     }
 
     // Calculate completion percentage
-    const servicesToUse = services !== undefined ? services : existingCase.services;
+    const servicesToUse =
+      services !== undefined ? services : existingCase.services;
     const totalServices = servicesToUse.length;
-    const completedCount = servicesToUse.filter(s => s.status === "Completed").length;
-    const overallCompletionPercentage = totalServices === 0 ? 50 : 
-      Math.min(50 + (completedCount * 50) / totalServices, 100);
-
+    const completedCount = servicesToUse.filter(
+      (s) => s.status === "Completed"
+    ).length;
+    const overallCompletionPercentage =
+      totalServices === 0
+        ? 50
+        : Math.min(50 + (completedCount * 50) / totalServices, 100);
 
     // Determine the new status based on service states
+    // Determine the new status based on service states
     let newStatus = status || existingCase.status;
-    
+
     if (services !== undefined) {
       if (totalServices === 0) {
         newStatus = "New-Case";
@@ -311,21 +331,40 @@ const updateCase = async (req, res) => {
       }
     }
 
+    // Enforce backend consistency for status field
+    if (newStatus === "Completed") {
+      status = "Completed";
+    } else if (newStatus === "In-Progress") {
+      status = "In-Progress";
+    } else {
+      // If frontend tries to set a conflicting status when not Completed/In-Progress, override
+      if (status === "Completed" || status === "In-Progress") {
+        status = newStatus;
+      }
+    }
+
     // Build update payload
     const updatePayload = {
       srNo: srNo !== undefined ? srNo : existingCase.srNo,
       ownerName: ownerName !== undefined ? ownerName : existingCase.ownerName,
-      clientName: clientName !== undefined ? clientName : existingCase.clientName,
+      clientName:
+        clientName !== undefined ? clientName : existingCase.clientName,
       unitName: unitName !== undefined ? unitName : existingCase.unitName,
-      franchiseAddress: franchiseAddress !== undefined 
-        ? franchiseAddress : existingCase.franchiseAddress,
+      franchiseAddress:
+        franchiseAddress !== undefined
+          ? franchiseAddress
+          : existingCase.franchiseAddress,
       promoters: promoters !== undefined ? promoters : existingCase.promoters,
-      authorizedPerson: authorizedPerson !== undefined 
-        ? authorizedPerson : existingCase.authorizedPerson,
+      authorizedPerson:
+        authorizedPerson !== undefined
+          ? authorizedPerson
+          : existingCase.authorizedPerson,
       services: services !== undefined ? services : existingCase.services,
       assignedUsers: formattedAssignedUsers,
-      reasonForStatus: reasonForStatus !== undefined 
-        ? reasonForStatus : existingCase.reasonForStatus,
+      reasonForStatus:
+        reasonForStatus !== undefined
+          ? reasonForStatus
+          : existingCase.reasonForStatus,
       status: status !== undefined ? status : existingCase.status,
       overallCompletionPercentage,
       overallStatus: newStatus,
@@ -342,15 +381,15 @@ const updateCase = async (req, res) => {
     if (changes.length > 0) {
       // Filter out service-added notifications if this isn't the first update
       const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
-      const filteredChanges = changes.filter(change => 
-        change.type !== 'service-added' || isFirstUpdate
+      const filteredChanges = changes.filter(
+        (change) => change.type !== "service-added" || isFirstUpdate
       );
 
       if (filteredChanges.length > 0) {
-        const changeMessage = `Case "${updated.unitName}" updated:\n${
-          filteredChanges.map(c => c.message).join(";\n")
-        }`;
-        
+        const changeMessage = `Case "${
+          updated.unitName
+        }" updated:\n${filteredChanges.map((c) => c.message).join(";\n")}`;
+
         for (const assignedUser of formattedAssignedUsers) {
           await Notification.create({
             type: "update",
@@ -364,16 +403,19 @@ const updateCase = async (req, res) => {
       }
     }
 
-    res.json({ 
-      message: "Case updated successfully", 
+    res.json({
+      message: "Case updated successfully",
       case: updated,
-      changes: changes.length > 0 ? changes.map(c => c.message) : ['No significant changes detected']
+      changes:
+        changes.length > 0
+          ? changes.map((c) => c.message)
+          : ["No significant changes detected"],
     });
   } catch (err) {
     console.error("Error updating case:", err);
-    res.status(500).json({ 
-      message: "Failed to update case", 
-      error: err.message 
+    res.status(500).json({
+      message: "Failed to update case",
+      error: err.message,
     });
   }
 };
