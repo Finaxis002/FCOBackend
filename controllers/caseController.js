@@ -206,8 +206,10 @@ const updateCase = async (req, res) => {
       services,
       assignedUsers,
       reasonForStatus,
-      status,
+      status: reqStatus, // renamed to avoid const reassignment error
     } = req.body;
+
+    let updatedStatus = reqStatus; // Mutable variable for status changes
 
     const caseId = req.params.id;
     const existingCase = await Case.findById(caseId);
@@ -245,10 +247,10 @@ const updateCase = async (req, res) => {
     }
 
     // Track status separately
-    if (status && status !== existingCase.status) {
+    if (reqStatus && reqStatus !== existingCase.status) {
       changes.push({
         type: "status-change",
-        message: `status changed from "${existingCase.status}" to "${status}"`,
+        message: `status changed from "${existingCase.status}" to "${reqStatus}"`,
       });
     }
 
@@ -316,8 +318,7 @@ const updateCase = async (req, res) => {
         : Math.min(50 + (completedCount * 50) / totalServices, 100);
 
     // Determine the new status based on service states
-    // Determine the new status based on service states
-    let newStatus = status || existingCase.status;
+    let newStatus = reqStatus || existingCase.status;
 
     if (services !== undefined) {
       if (totalServices === 0) {
@@ -333,13 +334,12 @@ const updateCase = async (req, res) => {
 
     // Enforce backend consistency for status field
     if (newStatus === "Completed") {
-      status = "Completed";
+      updatedStatus = "Completed";
     } else if (newStatus === "In-Progress") {
-      status = "In-Progress";
+      updatedStatus = "In-Progress";
     } else {
-      // If frontend tries to set a conflicting status when not Completed/In-Progress, override
-      if (status === "Completed" || status === "In-Progress") {
-        status = newStatus;
+      if (updatedStatus === "Completed" || updatedStatus === "In-Progress") {
+        updatedStatus = newStatus;
       }
     }
 
@@ -347,8 +347,7 @@ const updateCase = async (req, res) => {
     const updatePayload = {
       srNo: srNo !== undefined ? srNo : existingCase.srNo,
       ownerName: ownerName !== undefined ? ownerName : existingCase.ownerName,
-      clientName:
-        clientName !== undefined ? clientName : existingCase.clientName,
+      clientName: clientName !== undefined ? clientName : existingCase.clientName,
       unitName: unitName !== undefined ? unitName : existingCase.unitName,
       franchiseAddress:
         franchiseAddress !== undefined
@@ -365,7 +364,7 @@ const updateCase = async (req, res) => {
         reasonForStatus !== undefined
           ? reasonForStatus
           : existingCase.reasonForStatus,
-      status: status !== undefined ? status : existingCase.status,
+      status: updatedStatus !== undefined ? updatedStatus : existingCase.status,
       overallCompletionPercentage,
       overallStatus: newStatus,
       lastUpdate: new Date(),
@@ -419,6 +418,9 @@ const updateCase = async (req, res) => {
     });
   }
 };
+
+
+
 const deleteCase = async (req, res) => {
   try {
     const deleted = await Case.findByIdAndDelete(req.params.id);
