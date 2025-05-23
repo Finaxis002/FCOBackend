@@ -13,6 +13,7 @@ const notificationRoute = require("./routes/notifications.js");
 const serviceRoute = require('./routes/serviceRoute.js');
 const seedDefaultServices = require('./config/seedServices.js');
 const remarkRoute = require('./routes/remarksRoute.js')
+const path = require("path");
 
 
 dotenv.config();
@@ -42,7 +43,7 @@ app.use("/api/cases/:caseId/services", remarkRoute);
 
 
 
-
+app.use(express.static(path.join(__dirname, "client/build")));
 
 app.get("/", (req, res) => {
   res.send("FCO Backend API is running");
@@ -50,9 +51,11 @@ app.get("/", (req, res) => {
 
 
 
+
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
-});
+})
+
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

@@ -295,6 +295,22 @@ const updateCase = async (req, res) => {
     const overallCompletionPercentage = totalServices === 0 ? 50 : 
       Math.min(50 + (completedCount * 50) / totalServices, 100);
 
+
+    // Determine the new status based on service states
+    let newStatus = status || existingCase.status;
+    
+    if (services !== undefined) {
+      if (totalServices === 0) {
+        newStatus = "New-Case";
+      } else if (completedCount === totalServices) {
+        newStatus = "Completed";
+      } else if (completedCount > 0) {
+        newStatus = "In-Progress";
+      } else {
+        newStatus = "New-Case";
+      }
+    }
+
     // Build update payload
     const updatePayload = {
       srNo: srNo !== undefined ? srNo : existingCase.srNo,
@@ -312,7 +328,7 @@ const updateCase = async (req, res) => {
         ? reasonForStatus : existingCase.reasonForStatus,
       status: status !== undefined ? status : existingCase.status,
       overallCompletionPercentage,
-      overallStatus: status !== undefined ? status : existingCase.status,
+      overallStatus: newStatus,
       lastUpdate: new Date(),
     };
 
