@@ -345,16 +345,24 @@ const updateCase = async (req, res) => {
 
     // Send notifications only if there are actual changes
     if (changes.length > 0) {
-      // Filter out service-added notifications if this isn't the first update
       const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
+
+      // Check if 'name' field change exists
+      const hasNameChange = changes.some((change) =>
+        change.message.startsWith("name changed")
+      );
+
+      // Filter out service-added notifications if not first update
       let filteredChanges = changes.filter(
         (change) => change.type !== "service-added" || isFirstUpdate
       );
 
-      // Further filter out the 'unitName' change message
-      filteredChanges = filteredChanges.filter(
-        (change) => !change.message.startsWith("unitName changed")
-      );
+      // If name changed, exclude unitName change notifications
+      if (hasNameChange) {
+        filteredChanges = filteredChanges.filter(
+          (change) => !change.message.startsWith("unitName changed")
+        );
+      }
 
       if (filteredChanges.length > 0) {
         const changeMessage = `Case "${
