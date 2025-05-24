@@ -203,7 +203,8 @@ const updateCase = async (req, res) => {
 
     // Track simple field changes (ignore computed/internal fields)
     for (const key in req.body) {
-      if (excludedKeys.includes(key) || ignoredForChangeCheck.includes(key)) continue;
+      if (excludedKeys.includes(key) || ignoredForChangeCheck.includes(key))
+        continue;
 
       const oldVal = existingCase[key];
       const newVal = req.body[key];
@@ -228,7 +229,6 @@ const updateCase = async (req, res) => {
       });
     }
 
- 
     // Process assignedUsers
     let formattedAssignedUsers = existingCase.assignedUsers;
     if (Array.isArray(assignedUsers)) {
@@ -313,7 +313,8 @@ const updateCase = async (req, res) => {
     const updatePayload = {
       srNo: srNo !== undefined ? srNo : existingCase.srNo,
       ownerName: ownerName !== undefined ? ownerName : existingCase.ownerName,
-      clientName: clientName !== undefined ? clientName : existingCase.clientName,
+      clientName:
+        clientName !== undefined ? clientName : existingCase.clientName,
       unitName: unitName !== undefined ? unitName : existingCase.unitName,
       franchiseAddress:
         franchiseAddress !== undefined
@@ -346,8 +347,13 @@ const updateCase = async (req, res) => {
     if (changes.length > 0) {
       // Filter out service-added notifications if this isn't the first update
       const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
-      const filteredChanges = changes.filter(
+      let filteredChanges = changes.filter(
         (change) => change.type !== "service-added" || isFirstUpdate
+      );
+
+      // Further filter out the 'unitName' change message
+      filteredChanges = filteredChanges.filter(
+        (change) => !change.message.startsWith("unitName changed")
       );
 
       if (filteredChanges.length > 0) {
@@ -384,9 +390,6 @@ const updateCase = async (req, res) => {
     });
   }
 };
-
-
-
 
 const deleteCase = async (req, res) => {
   try {
