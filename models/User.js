@@ -9,9 +9,9 @@ const defaultPermissions = {
   userRolesAndResponsibility: false,
   delete: false,
   edit: false,
-  remarksAndChat: false,
+  remarks: false, // 🔄 separated
+  chat: false, // 🔄 separated
 };
-
 
 const userSchema = new mongoose.Schema(
   {
