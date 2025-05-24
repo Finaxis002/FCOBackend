@@ -206,18 +206,22 @@ const updateCase = async (req, res) => {
       if (excludedKeys.includes(key) || ignoredForChangeCheck.includes(key))
         continue;
 
-      const oldVal = existingCase[key];
+      // Normalize 'name' to 'unitName' for comparison
+      const compareKey = key === "name" ? "unitName" : key;
+
+      const oldVal = existingCase[compareKey];
       const newVal = req.body[key];
 
-      // Ignore if both are undefined/null or equal
       if ((oldVal == null && newVal == null) || oldVal === newVal) continue;
 
-      // Skip deep object comparisons here
       if (typeof oldVal === "object" && typeof newVal === "object") continue;
+
+      // Skip 'name' changes entirely since we handle 'unitName'
+      if (key === "name") continue;
 
       changes.push({
         type: "field-change",
-        message: `${key} changed from "${oldVal}" to "${newVal}"`,
+       message: `${key} changed from "${oldVal ?? ''}" to "${newVal ?? ''}"`,
       });
     }
 
