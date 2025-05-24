@@ -1,5 +1,6 @@
 const express = require("express");
 const User = require("../models/User.js");
+const Admin = require("../models/Admin.js");
 const Role = require("../models/Role"); // Import Role model
 const bcrypt = require("bcrypt");
 const router = express.Router();
@@ -55,20 +56,29 @@ router.get("/", async (req, res) => {
 });
 
 
-// GET /api/users/:id
 router.get("/:id", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password"); // exclude password
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    const { id } = req.params;
+
+    // Try to find user first
+    let user = await User.findById(id).select("-password");
+    if (user) {
+      return res.json(user);
     }
-    res.json(user);
+
+    // If not found in User, try Admin collection (exclude password or sensitive fields accordingly)
+    const admin = await Admin.findById(id).select("-password");
+    if (admin) {
+      return res.json(admin);
+    }
+
+    // If not found anywhere
+    return res.status(404).json({ message: "User not found" });
   } catch (error) {
     console.error("Fetch user error:", error);
-    res.status(500).json({ message: "Server error fetching user" });
+    return res.status(500).json({ message: "Server error fetching user" });
   }
 });
-
 
 // Update User
 

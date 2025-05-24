@@ -158,7 +158,6 @@ const getcase = async (req, res) => {
 const updateCase = async (req, res) => {
   try {
     const {
-      userName,
       srNo,
       ownerName,
       clientName,
