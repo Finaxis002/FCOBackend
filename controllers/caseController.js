@@ -188,6 +188,7 @@ const updateCase = async (req, res) => {
       "updatedAt",
       "assignedUsers",
       "services",
+      "status",
     ];
 
     const ignoredForChangeCheck = [
