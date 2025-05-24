@@ -1,9 +1,9 @@
 const express = require("express");
 const User = require("../models/User.js");
+const Role = require("../models/Role"); // Import Role model
 const bcrypt = require("bcrypt");
 const router = express.Router();
 
-// Create User
 // Create User
 router.post("/", async (req, res) => {
   try {
@@ -71,21 +71,42 @@ router.get("/:id", async (req, res) => {
 
 
 // Update User
+
+
 router.put("/:id", async (req, res) => {
   try {
     const { userId, name, email, role } = req.body;
+
+    // Find the role document by role name
+    const roleDoc = await Role.findOne({ name: role });
+    if (!roleDoc) {
+      return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // Prepare update data including permissions from roleDoc
+    const updateData = {
+      userId,
+      name,
+      email,
+      role,
+      permissions: roleDoc.permissions, // Set permissions from role
+    };
+
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { userId, name, email, role }, // ✅ Pass userId here
+      updateData,
       { new: true }
     );
+
     if (!updatedUser)
       return res.status(404).json({ message: "User not found" });
+
     res.json(updatedUser);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // Delete User
 router.delete("/:id", async (req, res) => {
