@@ -75,7 +75,7 @@ const addCase = async (req, res) => {
     for (const assignedUser of formattedAssignedUsers) {
       await Notification.create({
         type: "creation",
-        message: `You have been assigned to a new case: "${savedCase.unitName}".`,
+        message: `You have been assigned to a new case: "${savedCase.unitName}" created by ${userName}.`,
         userId: assignedUser._id,
         userName: assignedUser.name,
         caseId: savedCase._id,
@@ -90,7 +90,7 @@ const addCase = async (req, res) => {
     for (const admin of admins) {
       await Notification.create({
         type: "creation",
-        message: `A new case "${savedCase.unitName}" has been created and assigned to: ${assignedNames}.`,
+        message: `A new case "${savedCase.unitName}" has been created by ${userName} and assigned to: ${assignedNames}.`,
         userId: admin._id,
         userName: admin.name,
         caseId: savedCase._id,
@@ -371,7 +371,9 @@ const updateCase = async (req, res) => {
       if (filteredChanges.length > 0) {
         const changeMessage = `Case "${
           updated.unitName
-        }" updated:\n${filteredChanges.map((c) => c.message).join(";\n")}`;
+        }" updated by ${userName}:\n${filteredChanges
+          .map((c) => c.message)
+          .join(";\n")}`;
 
         // Notify assigned users
         for (const assignedUser of formattedAssignedUsers) {
