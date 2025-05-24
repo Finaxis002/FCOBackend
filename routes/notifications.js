@@ -25,8 +25,12 @@ const { authMiddleware } = require("../middleware/auth"); // Add auth middleware
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    // Always filter by logged in user's ID
-    const filter = { userId: req.user._id };
+    let filter = {};
+    
+    const role = (req.userRole || req.user.role || "").toLowerCase();
+    if (role !== 'admin' && role !== 'super admin') {
+      filter = { userId: req.user._id };
+    }
 
     const notifications = await Notification.find(filter)
       .sort({ timestamp: -1 })
@@ -37,7 +41,6 @@ router.get('/', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Error fetching notifications' });
   }
 });
-
 
 
 

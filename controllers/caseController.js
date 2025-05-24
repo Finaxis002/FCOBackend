@@ -155,45 +155,6 @@ const getcase = async (req, res) => {
   }
 };
 
-// ✅ PUT - Update case by ID
-const getServiceStatusChanges = (oldServices = [], newServices = []) => {
-  const changes = [];
-
-  // Create maps using service name as key (since IDs might be missing)
-  const oldServicesMap = new Map();
-  oldServices.forEach((service) => {
-    oldServicesMap.set(service.name.toLowerCase(), service);
-  });
-
-  const newServicesMap = new Map();
-  newServices.forEach((service) => {
-    newServicesMap.set(service.name.toLowerCase(), service);
-  });
-
-  // Check for added services (only notify about truly new services)
-  newServicesMap.forEach((newService, key) => {
-    if (!oldServicesMap.has(key)) {
-      changes.push({
-        type: "service-added",
-        message: `Service "${newService.name}" was added with status "${newService.status}".`,
-      });
-    }
-  });
-
-  // Check for status changes
-  newServicesMap.forEach((newService, key) => {
-    const oldService = oldServicesMap.get(key);
-    if (oldService && oldService.status !== newService.status) {
-      changes.push({
-        type: "service-status",
-        message: `Service "${newService.name}" status changed from "${oldService.status}" to "${newService.status}".`,
-      });
-    }
-  });
-
-  return changes;
-};
-
 const updateCase = async (req, res) => {
   try {
     const {
@@ -267,15 +228,7 @@ const updateCase = async (req, res) => {
       });
     }
 
-    // Only check service changes if services were provided in the request
-    if (services !== undefined) {
-      const serviceStatusChanges = getServiceStatusChanges(
-        existingCase.services || [],
-        services || []
-      );
-      changes.push(...serviceStatusChanges);
-    }
-
+ 
     // Process assignedUsers
     let formattedAssignedUsers = existingCase.assignedUsers;
     if (Array.isArray(assignedUsers)) {
