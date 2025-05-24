@@ -12,7 +12,7 @@ const addCase = async (req, res) => {
       clientName,
       unitName,
       franchiseAddress,
-      promoters,
+      stateHead,
       authorizedPerson,
       services,
       assignedUsers,
@@ -58,7 +58,7 @@ const addCase = async (req, res) => {
       clientName,
       unitName,
       franchiseAddress,
-      promoters,
+      stateHead,
       authorizedPerson,
       services,
       overallCompletionPercentage,
@@ -202,7 +202,7 @@ const updateCase = async (req, res) => {
       clientName,
       unitName,
       franchiseAddress,
-      promoters,
+      stateHead,
       authorizedPerson,
       services,
       assignedUsers,
@@ -354,7 +354,7 @@ const updateCase = async (req, res) => {
         franchiseAddress !== undefined
           ? franchiseAddress
           : existingCase.franchiseAddress,
-      promoters: promoters !== undefined ? promoters : existingCase.promoters,
+      stateHead: stateHead !== undefined ? stateHead : existingCase.stateHead,
       authorizedPerson:
         authorizedPerson !== undefined
           ? authorizedPerson

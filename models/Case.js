@@ -6,7 +6,7 @@ const caseSchema = new mongoose.Schema({
   clientName: String,
   unitName: String,
   franchiseAddress: String,
-  promoters: [String],
+  stateHead: String,
   authorizedPerson: String,
   services: [
     {
