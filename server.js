@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const http = require("http");
+const path = require("path");
 const connectDB = require("./config/db.js")
 const caseRoutes = require("./routes/caseRoutes.js")
 const userRoutes = require ('./routes/userRoutes.js');
@@ -13,7 +14,8 @@ const notificationRoute = require("./routes/notifications.js");
 const serviceRoute = require('./routes/serviceRoute.js');
 const seedDefaultServices = require('./config/seedServices.js');
 const remarkRoute = require('./routes/remarksRoute.js')
-const path = require("path");
+const roleRoute = require('./routes/roleRoutes.js')
+
 
 
 dotenv.config();
@@ -40,6 +42,7 @@ app.use("/api/auth", loginRoute);
 app.use("/api/notifications", notificationRoute)
 app.use("/api/services", serviceRoute);
 app.use("/api/cases/:caseId/services", remarkRoute);
+app.use("/api/roles", roleRoute);
 
 
 
