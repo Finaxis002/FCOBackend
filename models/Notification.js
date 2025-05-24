@@ -3,7 +3,19 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['update', 'creation', 'assign', 'deletion', 'other'],
+    enum: [
+      'update', 
+      'creation', 
+      'assign', 
+      'deletion', 
+      'user-created', 
+      'user-updated', 
+      'remark-added', 
+      'service-status',
+      'status-changed',
+      'other',
+      'remark',
+    ],
     required: true,
   },
   message: { 
@@ -28,6 +40,11 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: false 
   },
+  serviceId: {  // add this if you want service-related notifications
+    type: String,
+    ref: 'Service',
+    required: false
+  },
   read: { 
     type: Boolean, 
     default: false 
@@ -37,7 +54,7 @@ const notificationSchema = new mongoose.Schema({
     default: Date.now 
   },
 
-  // New audit fields:
+  // Audit fields for tracking who triggered notification
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -54,6 +71,5 @@ const notificationSchema = new mongoose.Schema({
     required: false
   },
 });
-
 
 module.exports = mongoose.model('Notification', notificationSchema);
