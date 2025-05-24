@@ -4,9 +4,10 @@ const bcrypt = require("bcrypt");
 const router = express.Router();
 
 // Create User
+// Create User
 router.post("/", async (req, res) => {
   try {
-    const { userId, name, email, role, password } = req.body;
+    const { userId, name, email, role, password, permissions } = req.body;
 
     // Validation
     if (!userId || !name || !email || !password) {
@@ -20,12 +21,20 @@ router.post("/", async (req, res) => {
     }
     const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${name}`;
 
-    // ✅ Create new user (password will be hashed by Mongoose pre-save hook)
-   const newUser = new User({ userId, name, email, role, password, avatarUrl });
+    // Create new user (password hashing done in pre-save hook)
+    const newUser = new User({
+      userId,
+      name,
+      email,
+      role,
+      password,
+      permissions: permissions || {}, // <-- save permissions here
+      avatarUrl,
+    });
 
     await newUser.save();
 
-    // ✅ Don't return password in response
+    // Don't return password in response
     const { password: _, ...safeUser } = newUser.toObject();
 
     res.status(201).json(safeUser);
@@ -33,6 +42,7 @@ router.post("/", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 
 // Get All Users
 router.get("/", async (req, res) => {
