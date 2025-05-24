@@ -158,6 +158,7 @@ const getcase = async (req, res) => {
 const updateCase = async (req, res) => {
   try {
     const {
+      userName,
       srNo,
       ownerName,
       clientName,
@@ -347,6 +348,71 @@ const updateCase = async (req, res) => {
       runValidators: true,
     });
 
+    // --- Detect service status changes ---
+
+    const oldServices = existingCase.services || [];
+    const newServices = updated.services || [];
+
+    // Create a map for quick lookup of old services by id or name (use id or name as unique)
+    const oldServicesMap = new Map(
+      oldServices.map((s) => [s.id ?? s._id?.toString() ?? s.name, s])
+    );
+
+    const statusChanges = [];
+
+    for (const newService of newServices) {
+      const key =
+        newService.id ?? newService._id?.toString() ?? newService.name;
+      const oldService = oldServicesMap.get(key);
+      if (oldService && oldService.status !== newService.status) {
+        statusChanges.push({
+          serviceId: newService.id ?? null,
+          serviceName: newService.name,
+          oldStatus: oldService.status,
+          newStatus: newService.status,
+        });
+      }
+    }
+
+    // Send notifications if there are any service status changes
+    if (statusChanges.length > 0) {
+      // Compose notification message for each changed service
+      for (const change of statusChanges) {
+        const notificationMessage = `Service "${change.serviceName}" status changed from "${change.oldStatus}" to "${change.newStatus}" in Case "${updated.unitName}"`;
+
+        // Notify assigned users (excluding updater if you have updater userId, you can add that logic)
+        for (const assignedUser of formattedAssignedUsers) {
+          await Notification.create({
+            type: "service-status",
+            message: notificationMessage,
+            userId: assignedUser._id,
+            userName: assignedUser.name,
+            caseId: updated._id,
+            caseName: updated.unitName,
+            serviceId: change.serviceId,
+            serviceName: change.serviceName,
+            createdBy: req.body.updatedByUserId || null, // pass this in request for audit if available
+          });
+        }
+
+        // Notify all admins/superadmins
+        const admins = await Admin.find().select("_id name");
+        for (const admin of admins) {
+          await Notification.create({
+            type: "service-status",
+            message: notificationMessage,
+            userId: admin._id,
+            userName: admin.name,
+            caseId: updated._id,
+            caseName: updated.unitName,
+            serviceId: change.serviceId,
+            serviceName: change.serviceName,
+            createdBy: req.body.updatedByUserId || null,
+          });
+        }
+      }
+    }
+
     // Send notifications only if there are actual changes
     if (changes.length > 0) {
       const isFirstUpdate = existingCase.lastUpdate === existingCase.createdAt;
@@ -369,11 +435,10 @@ const updateCase = async (req, res) => {
       }
 
       if (filteredChanges.length > 0) {
+        // Removed "updated by ..." from message here
         const changeMessage = `Case "${
           updated.unitName
-        }" updated by ${userName}:\n${filteredChanges
-          .map((c) => c.message)
-          .join(";\n")}`;
+        }" updated:\n${filteredChanges.map((c) => c.message).join(";\n")}`;
 
         // Notify assigned users
         for (const assignedUser of formattedAssignedUsers) {
@@ -384,6 +449,7 @@ const updateCase = async (req, res) => {
             userName: assignedUser.name,
             caseId: updated._id,
             caseName: updated.unitName,
+            // removed updatedBy field
           });
         }
 
@@ -397,6 +463,7 @@ const updateCase = async (req, res) => {
             userName: admin.name,
             caseId: updated._id,
             caseName: updated.unitName,
+            // removed updatedBy field
           });
         }
       }
