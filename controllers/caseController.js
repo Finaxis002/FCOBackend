@@ -228,23 +228,35 @@ const updateCase = async (req, res) => {
       "services",
     ];
 
-    // Track simple field changes
+    const ignoredForChangeCheck = [
+      "lastUpdate",
+      "updatedAt",
+      "assignedUsers",
+      "services",
+      "overallCompletionPercentage",
+      "overallStatus",
+      "createdAt",
+      "_id",
+      "__v",
+    ];
+
+    // Track simple field changes (ignore computed/internal fields)
     for (const key in req.body) {
-      if (excludedKeys.includes(key)) continue;
+      if (excludedKeys.includes(key) || ignoredForChangeCheck.includes(key)) continue;
 
       const oldVal = existingCase[key];
       const newVal = req.body[key];
 
-      if (
-        oldVal !== newVal &&
-        typeof oldVal !== "object" &&
-        typeof newVal !== "object"
-      ) {
-        changes.push({
-          type: "field-change",
-          message: `${key} changed from "${oldVal}" to "${newVal}"`,
-        });
-      }
+      // Ignore if both are undefined/null or equal
+      if ((oldVal == null && newVal == null) || oldVal === newVal) continue;
+
+      // Skip deep object comparisons here
+      if (typeof oldVal === "object" && typeof newVal === "object") continue;
+
+      changes.push({
+        type: "field-change",
+        message: `${key} changed from "${oldVal}" to "${newVal}"`,
+      });
     }
 
     // Track status separately
@@ -419,6 +431,7 @@ const updateCase = async (req, res) => {
     });
   }
 };
+
 
 
 
