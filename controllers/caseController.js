@@ -221,7 +221,7 @@ const updateCase = async (req, res) => {
 
       changes.push({
         type: "field-change",
-       message: `${key} changed from "${oldVal ?? ''}" to "${newVal ?? ''}"`,
+        message: `${key} changed from "${oldVal ?? ""}" to "${newVal ?? ""}"`,
       });
     }
 
@@ -373,12 +373,26 @@ const updateCase = async (req, res) => {
           updated.unitName
         }" updated:\n${filteredChanges.map((c) => c.message).join(";\n")}`;
 
+        // Notify assigned users
         for (const assignedUser of formattedAssignedUsers) {
           await Notification.create({
             type: "update",
             message: changeMessage,
             userId: assignedUser._id,
             userName: assignedUser.name,
+            caseId: updated._id,
+            caseName: updated.unitName,
+          });
+        }
+
+        // Notify all admins/superadmins as well
+        const admins = await Admin.find().select("_id name");
+        for (const admin of admins) {
+          await Notification.create({
+            type: "update",
+            message: changeMessage,
+            userId: admin._id,
+            userName: admin.name,
             caseId: updated._id,
             caseName: updated.unitName,
           });

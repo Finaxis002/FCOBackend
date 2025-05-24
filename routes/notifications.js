@@ -4,11 +4,14 @@ const router = express.Router();
 const Notification = require("../models/Notification");
 const { authMiddleware } = require("../middleware/auth"); // Add auth middleware as per your app
 
-// Get notifications for current user
-// router.get("/", authMiddleware, async (req, res) => {
+
+// router.get('/', authMiddleware, async (req, res) => {
 //   try {
 //     let filter = {};
-//     if ((req.userRole || "").toLowerCase() !== "admin") {
+    
+//     // Only filter by userId if role is not Admin or Super Admin
+//     const role = (req.userRole || req.user.role || "").toLowerCase();
+//     if (role !== 'admin' && role !== 'super admin') {
 //       filter = { userId: req.user._id };
 //     }
 
@@ -18,20 +21,21 @@ const { authMiddleware } = require("../middleware/auth"); // Add auth middleware
 
 //     res.json(notifications);
 //   } catch (err) {
-//     res.status(500).json({ message: "Error fetching notifications" });
+//     res.status(500).json({ message: 'Error fetching notifications' });
 //   }
 // });
 
+
+// Mark notification as read
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
     let filter = {};
     
-    // Only filter by userId if role is not Admin or Super Admin
     const role = (req.userRole || req.user.role || "").toLowerCase();
-    if (role !== 'admin' && role !== 'super admin') {
-      filter = { userId: req.user._id };
-    }
+
+    // Always filter by userId for everyone (users and admins alike)
+    filter = { userId: req.user._id };
 
     const notifications = await Notification.find(filter)
       .sort({ timestamp: -1 })
@@ -44,7 +48,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 
-// Mark notification as read
+
 router.put("/:id/read", authMiddleware, async (req, res) => {
   try {
     const notif = await Notification.findOneAndUpdate(
